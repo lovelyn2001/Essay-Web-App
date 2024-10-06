@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Essay Grader</title>
+	<link rel="stylesheet" href="/Styles/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Essay Grader</h1>
+        <form id="essayForm" method="post" action="/grade-essay">
+            <label for="topic">Essay Topic:</label>
+            <input type="text" id="topic" name="topic" placeholder="Enter the essay topic" required><br><br>
+            <label for="essay">Enter Essay:</label>
+            <textarea id="essay" name="essay" placeholder="Paste your essay here..." required></textarea>
+            <button type="submit" class="btn">Grade Essay</button>
+        </form>
+        <div class="result" id="result"></div>
+    </div>
+	<script src="/javascript/script.js"></script>
+</body>
+</html>
