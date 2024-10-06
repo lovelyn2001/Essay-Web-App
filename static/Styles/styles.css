@@ -92,7 +92,7 @@ label {
     background-color: rgba(0, 0, 0, 0.05);
     border-radius: 8px;
     color: #333;
-    display: none; /* Hidden by default */
+    display: block; /* Hidden by default */
 }
 
 .result.visible {
