@@ -4,6 +4,7 @@ const natural = require('natural');
 const spelling = require('spelling');
 const dictionary = require('spelling/dictionaries/en_US');
 const path = require('path');
+const PORT = process.env.PORT || 3030;
 
 const app = express();
 
@@ -99,6 +100,6 @@ app.post('/grade-essay', (req, res) => {
 	}
   });
 
-app.listen(3000, () => {
-    console.log('Server is running on port 3000');
-});
+  app.listen(PORT, () => {
+    console.log(`server started on port ${PORT}`);
+  });
