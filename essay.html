@@ -4,20 +4,121 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Essay Grader</title>
-	<link rel="stylesheet" href="/Styles/styles.css">
+    <link rel="stylesheet" href="/Styles/styles.css">
 </head>
 <body>
     <div class="container">
         <h1>Essay Grader</h1>
-        <form id="essayForm" method="post" action="/grade-essay">
-            <label for="topic">Essay Topic:</label>
-            <input type="text" id="topic" name="topic" placeholder="Enter the essay topic" required><br><br>
-            <label for="essay">Enter Essay:</label>
-            <textarea id="essay" name="essay" placeholder="Paste your essay here..." required></textarea>
-            <button type="submit" class="btn">Grade Essay</button>
-        </form>
+
+        <div id="auth-section">
+            <h2>User Registration</h2>
+            <form id="registrationForm">
+                <label for="username">Username:</label>
+                <input type="text" id="username" name="username" placeholder="Enter username" required>
+
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" placeholder="Enter email" required>
+
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" placeholder="Enter password" required>
+
+                <label for="role">Role:</label>
+                <select id="role" name="role">
+                    <option value="student">Student</option>
+                    <option value="instructor">Instructor</option>
+                </select>
+
+                <button type="submit" class="btn">Register</button>
+            </form>
+
+            <h2>Login</h2>
+            <form id="loginForm">
+                <label for="login-username">Username:</label>
+                <input type="text" id="login-username" name="username" placeholder="Enter username" required>
+
+                <label for="login-password">Password:</label>
+                <input type="password" id="login-password" name="password" placeholder="Enter password" required>
+
+                <button type="submit" class="btn">Login</button>
+            </form>
+        </div>
+
+        <div id="submission-section" style="display:none;">
+            <h2>Essay Submission</h2>
+            <form id="essayForm">
+                <label for="title">Essay Title:</label>
+                <input type="text" id="title" name="title" placeholder="Enter essay title" required>
+
+                <label for="course">Course Information:</label>
+                <input type="text" id="course" name="course" placeholder="Enter course info" required>
+
+                <label for="instructions">Assignment Instructions:</label>
+                <textarea id="instructions" name="instructions" placeholder="Enter assignment instructions" required></textarea>
+
+                <label for="essayFile">Upload Essay (PDF/DOC/DOCX):</label>
+                <input type="file" id="essayFile" name="essayFile" accept=".pdf,.doc,.docx" required>
+
+                <button type="submit" class="btn">Submit Essay</button>
+            </form>
+        </div>
+
+        <div id="grading-criteria-section" style="display:none;">
+            <h2>Grading Criteria Input</h2>
+            <form id="gradingCriteriaForm">
+                <label for="criteria">Grading Criteria:</label>
+                <textarea id="criteria" name="criteria" placeholder="Enter grading criteria..." required></textarea>
+
+                <label for="weightings">Weightings (comma separated):</label>
+                <input type="text" id="weightings" name="weightings" placeholder="Enter weightings for each criterion..." required>
+
+                <button type="submit" class="btn">Submit Criteria</button>
+            </form>
+        </div>
+
+        <div id="grade-adjustment-section" style="display:none;">
+            <h2>Manual Grade Adjustments</h2>
+            <form id="gradeAdjustmentForm">
+                <label for="essayId">Essay ID:</label>
+                <input type="text" id="essayId" name="essayId" placeholder="Enter essay ID" required>
+
+                <label for="adjustedScore">Adjusted Score:</label>
+                <input type="number" id="adjustedScore" name="adjustedScore" placeholder="Enter adjusted score" required>
+
+                <label for="comments">Comments:</label>
+                <textarea id="comments" name="comments" placeholder="Enter comments (optional)"></textarea>
+
+                <button type="submit" class="btn">Adjust Grade</button>
+            </form>
+        </div>
+
+        <div id="feedback-section" style="display:none;">
+            <h2>Feedback Input</h2>
+            <form id="feedbackForm">
+                <label for="feedbackEssayId">Essay ID:</label>
+                <input type="text" id="feedbackEssayId" name="feedbackEssayId" placeholder="Enter essay ID" required>
+
+                <label for="feedbackComments">Feedback Comments:</label>
+                <textarea id="feedbackComments" name="feedbackComments" placeholder="Enter feedback comments..." required></textarea>
+
+                <button type="submit" class="btn">Submit Feedback</button>
+            </form>
+        </div>
+
+        <div id="plagiarism-section" style="display:none;">
+            <h2>Plagiarism Check Input</h2>
+            <form id="plagiarismForm">
+                <label for="plagiarismEssayId">Essay ID:</label>
+                <input type="text" id="plagiarismEssayId" name="plagiarismEssayId" placeholder="Enter essay ID" required>
+
+                <label for="plagiarismThreshold">Plagiarism Threshold (%):</label>
+                <input type="number" id="plagiarismThreshold" name="plagiarismThreshold" placeholder="Enter threshold" required>
+
+                <button type="submit" class="btn">Set Plagiarism Threshold</button>
+            </form>
+        </div>
+
         <div class="result" id="result"></div>
     </div>
-	<script src="/javascript/script.js"></script>
+    <script src="/javascript/script.js"></script>
 </body>
 </html>

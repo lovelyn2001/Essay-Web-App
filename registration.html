@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Essay Grading System - Registration</title>
+    <link rel="stylesheet" href="Styles/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Register</h1>
+        
+        <!-- Choose User Role (Student or Admin) -->
+        <div id="role-selection">
+            <label>
+                <input type="radio" name="role" value="student" checked> Student
+            </label>
+            <label>
+                <input type="radio" name="role" value="admin"> Admin
+            </label>
+        </div>
+
+        <!-- Student Registration Form -->
+        <div id="student-form">
+            <form id="studentRegistrationForm">
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" required>
+                
+                <label for="regNumber">Registration Number:</label>
+                <input type="text" id="regNumber" name="regNumber" required>
+
+                <label for="department">Department:</label>
+                <input type="text" id="department" name="department" required>
+                
+                <p>Registered already? <a href="/login">Login here</a></p>
+                <button type="submit" class="btn">Register</button>
+            </form>
+        </div>
+
+        <!-- Admin Login -->
+        <div id="admin-form" style="display:none;">
+            <form id="adminLoginForm">
+                <label for="adminUsername">Username:</label>
+                <input type="text" id="adminUsername" name="username" required>
+
+                <label for="adminPassword">Password:</label>
+                <input type="password" id="adminPassword" name="password" required>
+
+                <button type="submit" class="btn">Login</button>
+            </form>
+        </div>
+    </div>
+    <script src="javascript/script.js"></script> <!-- Ensure correct path -->
+</body>
+</html>

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard</title>
+    <link rel="stylesheet" href="Styles/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Submit Essay</h1>
+        <form id="essayForm" enctype="multipart/form-data">
+            <label for="title">Essay Title:</label>
+            <input type="text" id="title" name="title" required>
+        
+            <label for="courseCode">Course Code:</label>
+            <input type="text" id="courseCode" name="courseCode" required>
+        
+            <label for="essayFile">Upload Essay (Max 20MB, PDF/DOC/DOCX):</label>
+            <input type="file" id="essayFile" name="essayFile" accept=".pdf,.doc,.docx" required>
+        
+            <button type="submit" class="btn">Submit</button>
+        </form>
+        
+        <div id="result" class="result"></div>
+    </div>
+    <script src="javascript/script.js"></script>
+</body>
+</html>
