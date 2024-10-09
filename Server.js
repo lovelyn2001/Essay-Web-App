@@ -1,4 +1,5 @@
 const express = require('express');
+require('dotenv').config();
 const multer = require('multer');
 const bodyParser = require('body-parser');
 const natural = require('natural');
@@ -7,11 +8,19 @@ const dictionary = require('spelling/dictionaries/en_US');
 const mongoose = require('mongoose');
 const path = require('path');
 const session = require('express-session');
+const PORT = process.env.PORT || 3030;
+
 
 // Connect to MongoDB
-mongoose.connect('mongodb+srv://lovelyn2001:TapWap2001@fransica.gva0b.mongodb.net/essayGradingSystem', {
+mongoose.connect(process.env.MONGO_URL, {
     useNewUrlParser: true,
     useUnifiedTopology: true
+})
+.then(() => {
+    console.log('MongoDB connected successfully');
+})
+.catch((error) => {
+    console.error('MongoDB connection error:', error);
 });
 
 // Define User and Essay schemas
@@ -44,7 +53,7 @@ const app = express();
 
 // Session setup
 app.use(session({
-    secret: 'your-secret-key', // Change this to a secure secret
+    secret: 'your-secret-key', 
     resave: false,
     saveUninitialized: true,
     cookie: { secure: false } // Set to true if using HTTPS
@@ -178,12 +187,6 @@ app.post('/submit-essay', upload.single('essayFile'), async (req, res) => {
     const filePath = req.file.path; // Get the uploaded file path
     const userId = req.session.userId; // Get the user ID from the session
 
-    // Log the values to check if they're correct
-    console.log('Title:', title);
-    console.log('Course Code:', courseCode);
-    console.log('File Path:', filePath);
-    console.log('User ID:', userId);
-
     // Check if user is logged in
     if (!userId) {
         return res.json({ success: false, message: 'User not logged in!' });
@@ -249,6 +252,26 @@ app.post('/update-grade', async (req, res) => {
     }
 });
 
+// Route to add a comment to an essay
+app.post('/add-comment', async (req, res) => {
+    const { essayId, comment } = req.body;
+
+    try {
+        const essay = await Essay.findById(essayId);
+
+        if (essay) {
+            essay.grade.comments = comment; // Add the new comment
+            await essay.save(); // Save the changes to the database
+            res.json({ success: true, message: 'Comment added successfully!' });
+        } else {
+            res.json({ success: false, message: 'Essay not found!' });
+        }
+    } catch (error) {
+        console.error('Error adding comment:', error);
+        res.status(500).json({ success: false, message: 'Failed to add comment.' });
+    }
+});
+
 
 app.get('/download/:essayId', async (req, res) => {
     try {
@@ -264,7 +287,8 @@ app.get('/download/:essayId', async (req, res) => {
 });
 
 
+
 // Start Server
-app.listen(3000, () => {
-    console.log('Server running on http://localhost:3000');
-});
+app.listen(PORT, () => {
+    console.log(`server started on port ${PORT}`);
+  });
