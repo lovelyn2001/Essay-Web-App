@@ -8,6 +8,7 @@ const dictionary = require('spelling/dictionaries/en_US');
 const mongoose = require('mongoose');
 const path = require('path');
 const session = require('express-session');
+const fs = require('fs');
 const PORT = process.env.PORT || 3030;
 
 
@@ -61,16 +62,25 @@ app.use(session({
 }));
 
 
-// Set up storage engine with multer
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, 'uploads');
+
+if (!fs.existsSync(uploadsDir)){
+    fs.mkdirSync(uploadsDir);
+}
+
+
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, path.join(__dirname, 'uploads')); // Save files to 'uploads' folder
+        cb(null, uploadsDir); // Ensure this points to the uploads directory
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname)); // Save files with unique names
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
+
 
 const upload = multer({ storage: storage });
 
@@ -192,38 +202,40 @@ app.post('/login-student', async (req, res) => {
 });
 
 
-
-// Route to handle essay submission
 app.post('/submit-essay', upload.single('essayFile'), async (req, res) => {
     const { title, courseCode } = req.body;
+
+    // Check if a file was uploaded
+    if (!req.file) {
+        return res.status(400).json({ success: false, message: 'No file uploaded.' });
+    }
+
     const filePath = req.file.path; // Get the uploaded file path
     const userId = req.session.userId; // Get the user ID from the session
 
     try {
-        const essayContent = ''; // You would parse the uploaded file to get the essay content here
-        const grades = gradeEssay(title, essayContent); // Grade the essay using the new criteria
-
         const essay = new Essay({
             title,
             courseCode,
             filePath, // Store the file path in the database
             userId,
             grade: {
-                contentRelevanceScore: grades.contentRelevanceScore,
-                structureScore: grades.structureScore,
-                grammarScore: grades.grammarScore,
-                analysisScore: grades.analysisScore,
-                totalScore: grades.totalScore
+                contentRelevanceScore: 0,
+                structureScore: 0,
+                grammarScore: 0,
+                analysisScore: 0,
+                totalScore: 0
             }
         });
 
         await essay.save();
-        res.json({ success: true, message: 'Essay submitted and graded successfully!' });
+        res.json({ success: true, message: 'Essay submitted successfully!' });
     } catch (error) {
         console.error('Error saving essay:', error);
         res.status(500).json({ success: false, message: 'Error submitting essay.' });
     }
 });
+
 
 
 app.post('/update-grade', async (req, res) => {
