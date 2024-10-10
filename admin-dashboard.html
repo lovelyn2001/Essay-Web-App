@@ -21,10 +21,10 @@
                     <th>Department</th>
                     <th>Course Code</th>
                     <th>Essay Title</th>
-                    <th>Paragraph Score</th>
-                    <th>Relevance Score</th>
-                    <th>Spelling Score</th>
-                    <th>Word Count Score</th>
+                    <th>Content Relevance (30%)</th>
+                    <th>Organization & Structure (25%)</th>
+                    <th>Grammar & Mechanics (20%)</th>
+                    <th>Depth of Analysis (25%)</th>
                     <th>Total Score</th>
                     <th>Download Essay</th>
                     <th>Edit Grade</th>
@@ -53,16 +53,17 @@
                 essays.forEach(essay => {
                     const row = document.createElement('tr');
 
+                    // Add the row details
                     row.innerHTML = `
                         <td>${essay.userId.name}</td>
                         <td>${essay.userId.regNumber}</td>
                         <td>${essay.userId.department}</td>
                         <td>${essay.courseCode}</td>
                         <td>${essay.title}</td>
-                        <td>${essay.grade.paragraphScore}</td>
-                        <td>${essay.grade.topicScore}</td>
-                        <td>${essay.grade.spellingScore}</td>
-                        <td>${essay.grade.wordCountScore}</td>
+                        <td>${essay.grade.contentRelevanceScore}/30</td>
+                        <td>${essay.grade.structureScore}/25</td>
+                        <td>${essay.grade.grammarScore}/20</td>
+                        <td>${essay.grade.analysisScore}/25</td>
                         <td>${essay.grade.totalScore}/100</td>
                         <td><button onclick="downloadEssay('${essay._id}')">Download Essay</button></td>
                         <td><button onclick="editGrade('${essay._id}')">Edit Grade</button></td>
@@ -78,7 +79,7 @@
 
         // Function to handle grade editing
         async function editGrade(essayId) {
-            const newScores = prompt("Enter new scores (comma separated, e.g., 25,25,25,25)");
+            const newScores = prompt("Enter new scores (Content Relevance, Structure, Grammar, Analysis) e.g., 30,25,20,25");
             const comments = prompt("Enter additional comments for the student");
 
             if (newScores && comments !== null) {

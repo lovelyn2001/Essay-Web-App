@@ -36,14 +36,15 @@ const EssaySchema = new mongoose.Schema({
     filePath: { type: String, required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     grade: {
-        paragraphScore: { type: Number, default: 0 },
-        topicScore: { type: Number, default: 0 },
-        spellingScore: { type: Number, default: 0 },
-        wordCountScore: { type: Number, default: 0 },
+        contentRelevanceScore: { type: Number, default: 0 },
+        structureScore: { type: Number, default: 0 },
+        grammarScore: { type: Number, default: 0 },
+        analysisScore: { type: Number, default: 0 },
         totalScore: { type: Number, default: 0 },
         comments: { type: String, default: '' }
     }
 });
+
 
 
 const User = mongoose.model('User', UserSchema);
@@ -60,10 +61,18 @@ app.use(session({
 }));
 
 
-const upload = multer({
-    dest: 'uploads/', // Destination folder for uploaded files
-    limits: { fileSize: 20 * 1024 * 1024 } // Set the file size limit to 20MB
+// Set up storage engine with multer
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, path.join(__dirname, 'uploads')); // Save files to 'uploads' folder
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname)); // Save files with unique names
+    }
 });
+
+const upload = multer({ storage: storage });
 
 // Middleware
 app.use(bodyParser.json());
@@ -73,48 +82,51 @@ app.use(express.static(path.join(__dirname, 'static')));
 const spellingChecker = new spelling(dictionary);
 const tokenizer = new natural.WordTokenizer();
 
-// Grading function
+// Grading function based on the new criteria
 function gradeEssay(topic, essayContent) {
-    let paragraphScore, topicScore, spellingScore, wordCountScore;
+    let contentRelevanceScore, structureScore, grammarScore, analysisScore;
 
-    // Paragraph Check
-    const paragraphs = essayContent.split(/\n+/).filter(para => para.trim().length > 0).length;
-    paragraphScore = paragraphs >= 5 ? 25 : paragraphs >= 3 ? 15 : 5;
-
-    // Topic Relevance Check
+    // Content Relevance Check (30%)
     const essayWords = tokenizer.tokenize(essayContent.toLowerCase());
     const topicWords = tokenizer.tokenize(topic.toLowerCase());
     const relevantWords = topicWords.filter(word => essayWords.includes(word)).length; // Check for relevant words
-    topicScore = relevantWords > 0 ? 25 : 0;
+    contentRelevanceScore = relevantWords > 0 ? (relevantWords >= 5 ? 30 : 15) : 0;
 
-    // Spelling Check
+    // Organization and Structure Check (25%)
+    const paragraphs = essayContent.split(/\n+/).filter(para => para.trim().length > 0).length;
+    structureScore = paragraphs >= 5 ? 25 : paragraphs >= 3 ? 15 : 5;
+
+    // Grammar and Mechanics Check (20%)
     const spellingErrors = essayWords.filter(word => {
         try {
             return !spellingChecker.lookup(word);
         } catch (error) {
             console.error(`Error checking spelling for word "${word}": ${error.message}`);
-            return true; // Treat it as a spelling error if there's an exception
+            return true; // Treat as a spelling error if there's an exception
         }
     }).length;
 
-    spellingScore = spellingErrors <= 10 ? 25 : spellingErrors <= 50 ? 15 : 5;
+    grammarScore = spellingErrors <= 5 ? 20 : spellingErrors <= 15 ? 10 : 5;
 
-    // Word Count Check
+    // Depth of Analysis and Argument (25%)
+    // You can simulate this by checking the average word length and complexity of sentences (for simplicity)
     const wordCount = essayWords.length;
-    wordCountScore = wordCount >= 400 ? 25 : wordCount >= 200 ? 15 : 5;
+    const averageWordLength = essayWords.reduce((sum, word) => sum + word.length, 0) / wordCount;
+    analysisScore = averageWordLength > 5 ? 25 : averageWordLength > 4 ? 15 : 5;
 
     // Total Score
-    const totalScore = paragraphScore + topicScore + spellingScore + wordCountScore;
+    const totalScore = contentRelevanceScore + structureScore + grammarScore + analysisScore;
 
     // Return grading results
     return {
-        paragraphScore,
-        topicScore,
-        spellingScore,
-        wordCountScore,
+        contentRelevanceScore,
+        structureScore,
+        grammarScore,
+        analysisScore,
         totalScore
     };
 }
+
 
 
 // Routes
@@ -187,49 +199,32 @@ app.post('/submit-essay', upload.single('essayFile'), async (req, res) => {
     const filePath = req.file.path; // Get the uploaded file path
     const userId = req.session.userId; // Get the user ID from the session
 
-    // Check if user is logged in
-    if (!userId) {
-        return res.json({ success: false, message: 'User not logged in!' });
-    }
+    try {
+        const essayContent = ''; // You would parse the uploaded file to get the essay content here
+        const grades = gradeEssay(title, essayContent); // Grade the essay using the new criteria
 
-    // Read the essay content from the uploaded file
-    // Only if you really need to read the content, otherwise just save it
-    const fs = require('fs');
-    fs.readFile(filePath, 'utf-8', (err, essayContent) => {
-        if (err) {
-            console.error('Error reading essay file:', err);
-            return res.json({ success: false, message: 'Failed to read essay file.' });
-        }
-
-        const grades = gradeEssay(courseCode, essayContent); // Ensure you use the right function
-
-        // Create a new essay document
         const essay = new Essay({
             title,
             courseCode,
-            filePath,
+            filePath, // Store the file path in the database
             userId,
             grade: {
-                paragraphScore: grades.paragraphScore,
-                topicScore: grades.topicScore,
-                spellingScore: grades.spellingScore,
-                wordCountScore: grades.wordCountScore,
+                contentRelevanceScore: grades.contentRelevanceScore,
+                structureScore: grades.structureScore,
+                grammarScore: grades.grammarScore,
+                analysisScore: grades.analysisScore,
                 totalScore: grades.totalScore
             }
         });
 
-        // Save to the database
-        essay.save()
-            .then(() => {
-                console.log('Essay saved to database'); // Log for confirmation
-                return res.json({ success: true, message: 'Essay submitted and graded successfully!' });
-            })
-            .catch(error => {
-                console.error('Error saving essay to database:', error);
-                return res.json({ success: false, message: 'Failed to save essay. Please try again.' });
-            });
-    });
+        await essay.save();
+        res.json({ success: true, message: 'Essay submitted and graded successfully!' });
+    } catch (error) {
+        console.error('Error saving essay:', error);
+        res.status(500).json({ success: false, message: 'Error submitting essay.' });
+    }
 });
+
 
 app.post('/update-grade', async (req, res) => {
     const { essayId, newScores, comments } = req.body;
@@ -277,14 +272,17 @@ app.get('/download/:essayId', async (req, res) => {
     try {
         const essay = await Essay.findById(req.params.essayId);
         if (essay) {
-            res.download(essay.filePath);
+            const filePath = essay.filePath; // Get file path from the database
+            res.download(filePath); // Download the file
         } else {
-            res.status(404).send('File not found!');
+            res.status(404).json({ success: false, message: 'File not found!' });
         }
     } catch (error) {
-        res.status(500).send('Error downloading file.');
+        console.error('Error downloading file:', error);
+        res.status(500).json({ success: false, message: 'Error downloading file.' });
     }
 });
+
 
 
 
