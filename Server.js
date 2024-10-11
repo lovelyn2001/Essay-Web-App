@@ -243,21 +243,23 @@ app.post('/update-grade', async (req, res) => {
     try {
         const essay = await Essay.findById(essayId);
         if (essay) {
-            essay.grade.paragraphScore = newScores[0];
-            essay.grade.topicScore = newScores[1];
-            essay.grade.spellingScore = newScores[2];
-            essay.grade.wordCountScore = newScores[3];
-            essay.grade.totalScore = newScores.reduce((a, b) => a + b, 0);
-            essay.grade.comments = comments;
+            essay.grade.contentRelevanceScore = newScores[0];  // Updating Content Relevance
+            essay.grade.structureScore = newScores[1];         // Updating Organization & Structure
+            essay.grade.grammarScore = newScores[2];           // Updating Grammar & Mechanics
+            essay.grade.analysisScore = newScores[3];          // Updating Depth of Analysis
+            essay.grade.totalScore = newScores.reduce((a, b) => a + b, 0);  // Recalculating total score
+            essay.grade.comments = comments;                   // Adding comments
             await essay.save();
             res.json({ success: true, message: 'Grade updated successfully!' });
         } else {
             res.json({ success: false, message: 'Essay not found!' });
         }
     } catch (error) {
+        console.error('Error updating grade:', error);
         res.status(500).json({ success: false, message: 'Failed to update grade.' });
     }
 });
+
 
 // Route to add a comment to an essay
 app.post('/add-comment', async (req, res) => {
