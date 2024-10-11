@@ -37,72 +37,70 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', async function () {
-            try {
-                const response = await fetch('/essays'); // Fetch essays from the server
-                const essays = await response.json(); // Parse the response
+    try {
+        const response = await fetch('/essays'); // Fetch essays from the server
+        const essays = await response.json(); // Parse the response
 
-                const list = document.getElementById('essays-list');
-                list.innerHTML = ''; // Clear previous content
+        const list = document.getElementById('essays-list');
+        list.innerHTML = ''; // Clear previous content
 
-                if (essays.length === 0) {
-                    list.innerHTML = '<tr><td colspan="13">No essays submitted yet.</td></tr>';
-                    return;
-                }
-
-                // Loop through each essay and add a row to the table
-                essays.forEach(essay => {
-                    const row = document.createElement('tr');
-
-                    // Add the row details
-                    row.innerHTML = `
-                        <td>${essay.userId.name}</td>
-                        <td>${essay.userId.regNumber}</td>
-                        <td>${essay.userId.department}</td>
-                        <td>${essay.courseCode}</td>
-                        <td>${essay.title}</td>
-                        <td>${essay.grade.contentRelevanceScore}/30</td>
-                        <td>${essay.grade.structureScore}/25</td>
-                        <td>${essay.grade.grammarScore}/20</td>
-                        <td>${essay.grade.analysisScore}/25</td>
-                        <td>${essay.grade.totalScore}/100</td>
-                        <td><button onclick="downloadEssay('${essay._id}')">Download Essay</button></td>
-                        <td><button onclick="editGrade('${essay._id}')">Edit Grade</button></td>
-                        <td>${essay.grade.comments ? essay.grade.comments : 'No comments yet.'}</td>
-                    `;
-
-                    list.appendChild(row); // Append the row to the table body
-                });
-            } catch (error) {
-                console.error('Error fetching essays:', error);
-            }
-        });
-
-        // Function to handle grade editing
-        async function editGrade(essayId) {
-            const newScores = prompt("Enter new scores (Content Relevance, Structure, Grammar, Analysis) e.g., 30,25,20,25");
-            const comments = prompt("Enter additional comments for the student");
-
-            if (newScores && comments !== null) {
-                try {
-                    const response = await fetch('/update-grade', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            essayId,
-                            newScores: newScores.split(',').map(Number), // Convert to numbers
-                            comments
-                        })
-                    });
-
-                    const result = await response.json();
-                    alert(result.message);
-                    location.reload(); // Reload the page to refresh after grade update
-                } catch (error) {
-                    console.error('Error updating grade:', error);
-                }
-            }
+        if (essays.length === 0) {
+            list.innerHTML = '<tr><td colspan="13">No essays submitted yet.</td></tr>';
+            return;
         }
 
+        // Loop through each essay and add a row to the table
+        essays.forEach(essay => {
+            const user = essay.userId || {};  // Safeguard against missing user details
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${user.name || 'Unknown'}</td>
+                <td>${user.regNumber || 'Unknown'}</td>
+                <td>${user.department || 'Unknown'}</td>
+                <td>${essay.courseCode}</td>
+                <td>${essay.title}</td>
+                <td>${essay.grade.contentRelevanceScore}/30</td>
+                <td>${essay.grade.structureScore}/25</td>
+                <td>${essay.grade.grammarScore}/20</td>
+                <td>${essay.grade.analysisScore}/25</td>
+                <td>${essay.grade.totalScore}/100</td>
+                <td><button onclick="downloadEssay('${essay._id}')">Download Essay</button></td>
+                <td><button onclick="editGrade('${essay._id}')">Edit Grade</button></td>
+                <td>${essay.grade.comments ? essay.grade.comments : 'No comments yet.'}</td>
+            `;
+            list.appendChild(row); // Append the row to the table body
+        });
+    } catch (error) {
+        console.error('Error fetching essays:', error);
+    }
+});
+
+// Function to handle grade editing
+async function editGrade(essayId) {
+        const newScores = prompt("Enter new scores (Content Relevance, Structure, Grammar, Analysis) e.g., 30,25,20,25");
+        const comments = prompt("Enter additional comments for the student");
+
+        if (newScores && comments !== null) {
+            try {
+                const response = await fetch('/update-grade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        essayId,
+                        newScores: newScores.split(',').map(Number), // Convert to numbers
+                        comments
+                    })
+                });
+
+                const result = await response.json();
+                alert(result.message);
+                location.reload(); // Reload the page to refresh after grade update
+            } catch (error) {
+                console.error('Error updating grade:', error);
+            }
+        }
+    } 
         // Function to download the essay
         function downloadEssay(essayId) {
             window.location.href = `/download/${essayId}`; // Trigger file download

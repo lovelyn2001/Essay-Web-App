@@ -24,6 +24,8 @@ mongoose.connect(process.env.MONGO_URL, {
     console.error('MongoDB connection error:', error);
 });
 
+
+
 // Define User and Essay schemas
 const UserSchema = new mongoose.Schema({
     name: { type: String, required: true },
@@ -97,10 +99,11 @@ function gradeEssay(topic, essayContent) {
     let contentRelevanceScore, structureScore, grammarScore, analysisScore;
 
     // Content Relevance Check (30%)
-    const essayWords = tokenizer.tokenize(essayContent.toLowerCase());
-    const topicWords = tokenizer.tokenize(topic.toLowerCase());
-    const relevantWords = topicWords.filter(word => essayWords.includes(word)).length; // Check for relevant words
-    contentRelevanceScore = relevantWords > 0 ? (relevantWords >= 5 ? 30 : 15) : 0;
+const essayWords = tokenizer.tokenize(essayContent.toLowerCase());
+const topicWords = tokenizer.tokenize(topic.toLowerCase());
+const relevantWords = topicWords.filter(word => essayWords.includes(word)).length;
+contentRelevanceScore = relevantWords > 0 ? (relevantWords >= 5 ? 30 : 15) : 0;
+
 
     // Organization and Structure Check (25%)
     const paragraphs = essayContent.split(/\n+/).filter(para => para.trim().length > 0).length;
@@ -157,6 +160,7 @@ app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'adm
 
 app.get('/essays', async (req, res) => {
     try {
+        // Populate userId with user's details like name, regNumber, and department
         const essays = await Essay.find().populate('userId', 'name regNumber department');
         res.json(essays);
     } catch (error) {
@@ -202,6 +206,7 @@ app.post('/login-student', async (req, res) => {
 });
 
 
+// Route to handle essay submission
 app.post('/submit-essay', upload.single('essayFile'), async (req, res) => {
     const { title, courseCode } = req.body;
 
@@ -213,6 +218,18 @@ app.post('/submit-essay', upload.single('essayFile'), async (req, res) => {
     const filePath = req.file.path; // Get the uploaded file path
     const userId = req.session.userId; // Get the user ID from the session
 
+    // Read essay content from the file system
+    let essayContent;
+    try {
+        essayContent = fs.readFileSync(filePath, 'utf-8'); // Ensure the content is read properly
+    } catch (error) {
+        console.error('Error reading file:', error);
+        return res.status(500).json({ success: false, message: 'Error reading file content.' });
+    }
+
+    // Pass the topic and essay content to the grading function
+    const grades = gradeEssay("Health Care In Nigeria: Challenges and Prospects", essayContent);
+
     try {
         const essay = new Essay({
             title,
@@ -220,16 +237,16 @@ app.post('/submit-essay', upload.single('essayFile'), async (req, res) => {
             filePath, // Store the file path in the database
             userId,
             grade: {
-                contentRelevanceScore: 0,
-                structureScore: 0,
-                grammarScore: 0,
-                analysisScore: 0,
-                totalScore: 0
+                contentRelevanceScore: grades.contentRelevanceScore,
+                structureScore: grades.structureScore,
+                grammarScore: grades.grammarScore,
+                analysisScore: grades.analysisScore,
+                totalScore: grades.totalScore
             }
         });
 
         await essay.save();
-        res.json({ success: true, message: 'Essay submitted successfully!' });
+        res.json({ success: true, message: 'Essay submitted and graded successfully!' });
     } catch (error) {
         console.error('Error saving essay:', error);
         res.status(500).json({ success: false, message: 'Error submitting essay.' });
