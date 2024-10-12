@@ -9,24 +9,18 @@ const mongoose = require('mongoose');
 const path = require('path');
 const session = require('express-session');
 const fs = require('fs');
+const mammoth = require('mammoth');
 const PORT = process.env.PORT || 3030;
 
-
-// Connect to MongoDB
+// MongoDB Connection
 mongoose.connect(process.env.MONGO_URL, {
     useNewUrlParser: true,
     useUnifiedTopology: true
 })
-.then(() => {
-    console.log('MongoDB connected successfully');
-})
-.catch((error) => {
-    console.error('MongoDB connection error:', error);
-});
+.then(() => console.log('MongoDB connected successfully'))
+.catch(error => console.error('MongoDB connection error:', error));
 
-
-
-// Define User and Essay schemas
+// Define Schemas
 const UserSchema = new mongoose.Schema({
     name: { type: String, required: true },
     regNumber: { type: String, required: true, unique: true },
@@ -48,41 +42,31 @@ const EssaySchema = new mongoose.Schema({
     }
 });
 
-
-
 const User = mongoose.model('User', UserSchema);
 const Essay = mongoose.model('Essay', EssaySchema);
 
 const app = express();
 
-// Session setup
+// Session Setup
 app.use(session({
-    secret: 'your-secret-key', 
+    secret: 'your-secret-key',
     resave: false,
     saveUninitialized: true,
     cookie: { secure: false } // Set to true if using HTTPS
 }));
 
-
-
-// Create uploads directory if it doesn't exist
+// Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
 
-if (!fs.existsSync(uploadsDir)){
-    fs.mkdirSync(uploadsDir);
-}
-
-
+// Configure multer for file uploads
 const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, uploadsDir); // Ensure this points to the uploads directory
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => {
+        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+        cb(null, `${file.fieldname}-${uniqueSuffix}${path.extname(file.originalname)}`);
     }
 });
-
 
 const upload = multer({ storage: storage });
 
@@ -90,77 +74,109 @@ const upload = multer({ storage: storage });
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'static')));
 
-// Spelling checker and tokenizer
+// Spelling Checker and Tokenizer
 const spellingChecker = new spelling(dictionary);
 const tokenizer = new natural.WordTokenizer();
 
-// Grading function based on the new criteria
-function gradeEssay(topic, essayContent) {
-    let contentRelevanceScore, structureScore, grammarScore, analysisScore;
+// Helper Functions
+function extractKeyPhrases(topic) {
+    return topic.toLowerCase().split(/[\s,]+/);
+}
 
-    // Content Relevance Check (30%)
-const essayWords = tokenizer.tokenize(essayContent.toLowerCase());
-const topicWords = tokenizer.tokenize(topic.toLowerCase());
-const relevantWords = topicWords.filter(word => essayWords.includes(word)).length;
-contentRelevanceScore = relevantWords > 0 ? (relevantWords >= 5 ? 30 : 15) : 0;
+function calculateGrammarScore(essayWords) {
+    let spellingErrors = 0;
 
+    essayWords.forEach(word => {
+        console.log(`Processing word: ${word}`); // Log each word being processed
 
-    // Organization and Structure Check (25%)
-    const paragraphs = essayContent.split(/\n+/).filter(para => para.trim().length > 0).length;
-    structureScore = paragraphs >= 5 ? 25 : paragraphs >= 3 ? 15 : 5;
-
-    // Grammar and Mechanics Check (20%)
-    const spellingErrors = essayWords.filter(word => {
-        try {
-            return !spellingChecker.lookup(word);
-        } catch (error) {
-            console.error(`Error checking spelling for word "${word}": ${error.message}`);
-            return true; // Treat as a spelling error if there's an exception
+        // Check for repeated characters (e.g., "zzzzzz")
+        const repeatedCharRegex = /(.)\1{2,}/;
+        if (repeatedCharRegex.test(word)) {
+            spellingErrors += 10; // Penalize for repeated characters
+            console.log(`Word has repeated characters: ${word}`);
+            return; // Skip further checks for this word
         }
-    }).length;
 
-    grammarScore = spellingErrors <= 5 ? 20 : spellingErrors <= 15 ? 10 : 5;
+        // Clean the word (remove non-alphabetic characters)
+        const cleanWord = word.replace(/[^a-zA-Z]/g, '');
+        console.log(`Checking spelling for: ${cleanWord}`); // Log the cleaned word
 
-    // Depth of Analysis and Argument (25%)
-    // You can simulate this by checking the average word length and complexity of sentences (for simplicity)
+        // Only check valid words
+        if (cleanWord.length > 0) {
+            // Perform the word lookup
+            try {
+                const isValidWord = spellingChecker.lookup(cleanWord);
+                console.log(`Lookup result for "${cleanWord}":`, isValidWord); // Log the result of the lookup
+
+                // Check if the word is valid
+                if (!isValidWord.found) {
+                    spellingErrors += 10; // Penalize for invalid words
+                    console.log(`Word is not valid: ${cleanWord}`); // Log invalid words
+                } else {
+                    console.log(`Word is valid: ${cleanWord}`); // Log valid words
+                }
+            } catch (error) {
+                console.error(`Error checking spelling for word "${cleanWord}": ${error.message}`);
+                spellingErrors += 10; // Penalize for lookup error
+            }
+        } else {
+            console.log(`Skipped empty or non-alphanumeric word: ${word}`);
+        }
+    });
+
+    // Determine the grammar score based on the number of spelling errors
+    return spellingErrors <= 5 ? 20 :
+           spellingErrors <= 10 ? 15 :
+           spellingErrors <= 20 ? 10 : 5;
+}
+
+
+
+async function gradeEssay(topic, essayContent) {
+    let contentRelevanceScore = 0, structureScore = 0, grammarScore = 0, analysisScore = 0;
+
+    const keyPhrases = extractKeyPhrases(topic);
+    const essayWords = tokenizer.tokenize(essayContent.toLowerCase());
+
+    let relevantPhraseCount = keyPhrases.reduce((count, phrase) => {
+        const regex = new RegExp(`\\b${phrase}\\b`, 'i');
+        return regex.test(essayContent) ? count + 1 : count;
+    }, 0);
+
+    contentRelevanceScore = relevantPhraseCount >= 15 ? 30 :
+                            relevantPhraseCount >= 10 ? 20 :
+                            relevantPhraseCount > 5 ? 10 : 0;
+
+    const paragraphs = essayContent.split(/\n+/).filter(para => para.trim().length > 50);
+    structureScore = paragraphs.length >= 5 ? 25 :
+                     paragraphs.length >= 3 ? 15 :
+                     paragraphs.length > 0 ? 5 : 0;
+
+    grammarScore = calculateGrammarScore(essayWords);
+
     const wordCount = essayWords.length;
-    const averageWordLength = essayWords.reduce((sum, word) => sum + word.length, 0) / wordCount;
-    analysisScore = averageWordLength > 5 ? 25 : averageWordLength > 4 ? 15 : 5;
+    analysisScore = wordCount > 300 ? 25 :
+                    wordCount > 150 ? 15 : 5;
 
-    // Total Score
-    const totalScore = contentRelevanceScore + structureScore + grammarScore + analysisScore;
-
-    // Return grading results
     return {
         contentRelevanceScore,
         structureScore,
         grammarScore,
         analysisScore,
-        totalScore
+        totalScore: contentRelevanceScore + structureScore + grammarScore + analysisScore
     };
 }
-
-
 
 // Routes
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'registration.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'login.html')));
-// Serve Student Dashboard (for essay submission)
-app.get('/dashboard', (req, res) => {
-    if (req.session.userId) { // Check if user is logged in
-        res.sendFile(path.join(__dirname, 'student-dashboard.html'));
-    } else {
-        res.redirect('/'); // Redirect to registration if not logged in
-    }
-});
+app.get('/dashboard', (req, res) => req.session.userId ? res.sendFile(path.join(__dirname, 'student-dashboard.html')) : res.redirect('/'));
 app.get('/admin-login', (req, res) => res.sendFile(path.join(__dirname, 'admin-login.html')));
 app.get('/admin-dashboard', (req, res) => res.sendFile(path.join(__dirname, 'admin-dashboard.html')));
 
-// Admin Dashboard - View All Submitted Essays
-
+// Fetch all submitted essays
 app.get('/essays', async (req, res) => {
     try {
-        // Populate userId with user's details like name, regNumber, and department
         const essays = await Essay.find().populate('userId', 'name regNumber department');
         res.json(essays);
     } catch (error) {
@@ -169,155 +185,111 @@ app.get('/essays', async (req, res) => {
     }
 });
 
-
-// Register Student
+// Student registration
 app.post('/register-student', async (req, res) => {
     const { name, regNumber, department } = req.body;
-
-    // Check if student is already registered
     const existingStudent = await User.findOne({ regNumber });
-    if (existingStudent) {
-        return res.json({ success: false, message: 'Student already registered!' });
-    }
-
+    if (existingStudent) return res.json({ success: false, message: 'Student already registered!' });
+    
     const user = new User({ name, regNumber, department });
     await user.save();
     res.json({ success: true, message: 'Student registered successfully!' });
 });
 
-// Student Login
+// Student login
 app.post('/login-student', async (req, res) => {
     const { name, regNumber } = req.body;
-    
-    try {
-        const user = await User.findOne({ name, regNumber });
-
-        if (user) {
-            // Store user ID in session after successful login
-            req.session.userId = user._id; 
-            res.json({ success: true, message: 'Login successful!' });
-        } else {
-            res.json({ success: false, message: 'Invalid credentials!' });
-        }
-    } catch (error) {
-        console.error('Error during login:', error);
-        res.json({ success: false, message: 'An error occurred during login.' });
+    const user = await User.findOne({ name, regNumber });
+    if (user) {
+        req.session.userId = user._id;
+        res.json({ success: true, message: 'Login successful!' });
+    } else {
+        res.json({ success: false, message: 'Invalid credentials!' });
     }
 });
 
-
-// Route to handle essay submission
+// Submit essay
 app.post('/submit-essay', upload.single('essayFile'), async (req, res) => {
     const { title, courseCode } = req.body;
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded.' });
 
-    // Check if a file was uploaded
-    if (!req.file) {
-        return res.status(400).json({ success: false, message: 'No file uploaded.' });
-    }
-
-    const filePath = req.file.path; // Get the uploaded file path
-    const userId = req.session.userId; // Get the user ID from the session
-
-    // Read essay content from the file system
-    let essayContent;
-    try {
-        essayContent = fs.readFileSync(filePath, 'utf-8'); // Ensure the content is read properly
-    } catch (error) {
-        console.error('Error reading file:', error);
-        return res.status(500).json({ success: false, message: 'Error reading file content.' });
-    }
-
-    // Pass the topic and essay content to the grading function
-    const grades = gradeEssay("Health Care In Nigeria: Challenges and Prospects", essayContent);
+    const filePath = req.file.path;
+    const userId = req.session.userId;
 
     try {
+        const result = await mammoth.extractRawText({ path: filePath });
+        const essayContent = result.value;
+        const grades = await gradeEssay(title, essayContent);
+
         const essay = new Essay({
             title,
             courseCode,
-            filePath, // Store the file path in the database
+            filePath,
             userId,
-            grade: {
-                contentRelevanceScore: grades.contentRelevanceScore,
-                structureScore: grades.structureScore,
-                grammarScore: grades.grammarScore,
-                analysisScore: grades.analysisScore,
-                totalScore: grades.totalScore
-            }
+            grade: grades
         });
 
         await essay.save();
-        res.json({ success: true, message: 'Essay submitted and graded successfully!' });
+        res.json({ success: true, message: 'Essay submitted successfully!' });
     } catch (error) {
         console.error('Error saving essay:', error);
         res.status(500).json({ success: false, message: 'Error submitting essay.' });
     }
 });
 
-
-
+// Update essay grade
 app.post('/update-grade', async (req, res) => {
     const { essayId, newScores, comments } = req.body;
     try {
         const essay = await Essay.findById(essayId);
-        if (essay) {
-            essay.grade.contentRelevanceScore = newScores[0];  // Updating Content Relevance
-            essay.grade.structureScore = newScores[1];         // Updating Organization & Structure
-            essay.grade.grammarScore = newScores[2];           // Updating Grammar & Mechanics
-            essay.grade.analysisScore = newScores[3];          // Updating Depth of Analysis
-            essay.grade.totalScore = newScores.reduce((a, b) => a + b, 0);  // Recalculating total score
-            essay.grade.comments = comments;                   // Adding comments
-            await essay.save();
-            res.json({ success: true, message: 'Grade updated successfully!' });
-        } else {
-            res.json({ success: false, message: 'Essay not found!' });
-        }
+        if (!essay) return res.json({ success: false, message: 'Essay not found!' });
+
+        Object.assign(essay.grade, {
+            contentRelevanceScore: newScores[0],
+            structureScore: newScores[1],
+            grammarScore: newScores[2],
+            analysisScore: newScores[3],
+            totalScore: newScores.reduce((a, b) => a + b, 0),
+            comments
+        });
+
+        await essay.save();
+        res.json({ success: true, message: 'Grade updated successfully!' });
     } catch (error) {
         console.error('Error updating grade:', error);
         res.status(500).json({ success: false, message: 'Failed to update grade.' });
     }
 });
 
-
-// Route to add a comment to an essay
+// Add comment to essay
 app.post('/add-comment', async (req, res) => {
     const { essayId, comment } = req.body;
-
     try {
         const essay = await Essay.findById(essayId);
+        if (!essay) return res.json({ success: false, message: 'Essay not found!' });
 
-        if (essay) {
-            essay.grade.comments = comment; // Add the new comment
-            await essay.save(); // Save the changes to the database
-            res.json({ success: true, message: 'Comment added successfully!' });
-        } else {
-            res.json({ success: false, message: 'Essay not found!' });
-        }
+        essay.grade.comments = comment;
+        await essay.save();
+        res.json({ success: true, message: 'Comment added successfully!' });
     } catch (error) {
         console.error('Error adding comment:', error);
         res.status(500).json({ success: false, message: 'Failed to add comment.' });
     }
 });
 
-
+// Download essay
 app.get('/download/:essayId', async (req, res) => {
     try {
         const essay = await Essay.findById(req.params.essayId);
-        if (essay) {
-            const filePath = essay.filePath; // Get file path from the database
-            res.download(filePath); // Download the file
-        } else {
-            res.status(404).json({ success: false, message: 'File not found!' });
-        }
+        if (!essay) return res.status(404).json({ success: false, message: 'File not found!' });
+
+        res.download(essay.filePath);
     } catch (error) {
         console.error('Error downloading file:', error);
         res.status(500).json({ success: false, message: 'Error downloading file.' });
     }
 });
 
+// Start server
+app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
 
-
-
-// Start Server
-app.listen(PORT, () => {
-    console.log(`server started on port ${PORT}`);
-  });
